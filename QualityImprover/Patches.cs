@@ -1447,6 +1447,47 @@ namespace QualityImprover
                 return PLEncounterManager.Instance.PlayerShip != null && host != null && PLEncounterManager.Instance.PlayerShip.MyTLI == host.MyCurrentTLI;
             }
         }
+
+
+        [HarmonyPatch(typeof(PLAIPriorityOverride), nameof(PLAIPriorityOverride.HasDataField))]
+        class AIPriorityOverrideFixes
+        {
+            //This patch allows for hull breaches count in AI overrides to be changed as previously its case (100) wasn't included into the base method so the input box wasn't created
+            static bool Prefix(EPriorityOverrideType OverrideType, int OverrideSubID, ref bool __result)
+            {
+                __result = false;
+                if (OverrideType == EPriorityOverrideType.E_CUSTOM)
+                {
+                    switch (OverrideSubID)
+                    {
+                        case 100:
+                            __result = true;
+                            return false;
+                    }
+                }
+                return true;
+            }
+        }
+        [HarmonyPatch(typeof(PLTurret), nameof(PLTurret.Tick))]
+        class MissileButtonFix
+        {
+            //Patches the key code for firing missiles so that it uses the missile fire keybind not the right click keybind
+            //note about this the double right click to fire pulse laser is bound into that keybind so now it is double click fire missile as it should be while there is still a separate fire pulse laser keybind by default q
+            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                foreach (var instruction in instructions)
+                {
+                    if (instruction.operand is sbyte d && d == 14)
+                    {
+                        instruction.operand = (sbyte)PLInputBase.EInputActionName.fire_tracking_missile; //38, for some reason this operand is an sbyte although my replacement likely could be any valid integer related type
+#if DEBUG
+                        Debug.Log("Missile fire transpiler ran");
+#endif
+                    }
+                    yield return instruction;
+                }
+            }
+        }
     }
 }
 
