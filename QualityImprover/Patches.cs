@@ -1488,6 +1488,50 @@ namespace QualityImprover
                 }
             }
         }
+        [HarmonyPatch]
+        class ShopScrollFix
+        {
+            static int checkDisplayMode = -1;
+            [HarmonyPatch(typeof(PLItemShopMenu), nameof(PLItemShopMenu.Update))]
+            [HarmonyPostfix]
+            static void Postfix(PLItemShopMenu __instance) //Force Rebuilds the layout when switching between the buy/sell menu
+            {
+                if (__instance.DisplayMode != checkDisplayMode)
+                {
+                    checkDisplayMode = __instance.DisplayMode;
+                    LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)__instance.MainScrollView.transform);
+                }
+            }
+
+            [HarmonyPatch(typeof(PLUIMainMenu), nameof(PLUIMainMenu.Start))]
+            [HarmonyPostfix]
+            static void Postfix() //Adds extra components to the conent gameobject of the scrollview to make it always scale correctly when rebuilt
+            {
+                GameObject content = PLTabMenu.Instance.ItemShopMenu.MainScrollView.transform.Find("Viewport").Find("Content").gameObject;
+                content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                content.AddComponent<ShopScreenLayoutElement>();
+            }
+            class ShopScreenLayoutElement : LayoutElement
+            {
+                public override float preferredHeight //This calculates the correct height needed to contain all the different objects in the shop
+                {
+                    get
+                    {
+                        float height = 50f;
+                        PLItemShopMenu instance = PLTabMenu.Instance.ItemShopMenu;
+                        foreach (PLShopItemDisplay item in instance.AllSIDs)
+                        {
+                            if (item.IsSellView == (instance.DisplayMode == 1))
+                            {
+                                height += 85f;
+                            }
+                        }
+                        return height;
+                    }
+                    set => base.preferredHeight = value;
+                }
+            }
+        }
     }
 }
 
